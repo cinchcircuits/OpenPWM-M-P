@@ -73,7 +73,13 @@
 
 
 /* Pin numbering defs */
-enum {REV_PIN=0, FWD_PIN=1, PWM_PIN=2, LED_PIN=3, TEMP_PIN=4};
+enum {
+  REV_PIN=0,  // reverse output pin
+  FWD_PIN=1,  // forward output pin 
+  PWM_PIN=2,  // server pwm input pin
+  LED_PIN=3,  
+  TEMP_PIN=4  // connected to temperature thermistor
+};
 
 
 
@@ -104,10 +110,23 @@ void setDuty(int16_t duty)
 
 ISR(TIMER1_OVF_vect)
 {
-  // Toggle LED
-  PORTB |= (1<<LED_PIN);
-  _delay_us(1);
-  PORTB &= ~(1<<LED_PIN);  
+  //emptpy for now
+}
+
+
+ISR(INT0_vect)
+{
+  // Flash LED
+  if (PINB & (1<<PWM_PIN))
+  {
+    // rising edge of PWM
+    PORTB |= (1<<LED_PIN);
+  }
+  else
+  {
+    // falling edge of PWM
+    PORTB &= ~(1<<LED_PIN);  
+  }
 }
 
 
@@ -149,6 +168,10 @@ int main(void)
   // 4 : TEMP : input
   DDRB = (1<<REV_PIN) | (1<<FWD_PIN) | (1<<LED_PIN);
   PORTB = (1<<LED_PIN) | (1<<PWM_PIN);
+
+  // Enable int0 interrupt, on both rising and falling edges
+  MCUCR = (MCUCR & 0xFC) | 1; 
+  GIMSK = (1<<INT0);
 
   // Enable interrupts
   sei();
