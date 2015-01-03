@@ -15,6 +15,29 @@
 // CKSEL[3:0] = 2 : Calibrated internal osc
 // SUT[1:0] = 2   : 14CK + 64ms
 
+
+// Extended Fuse Byte : 0xFF
+// unused [7:1]   
+// SELFPRGEN 0    : 1   : Self-prgromming enabled   : no
+//
+// High Fuse Byte : 11011111b = 0xDF
+// RSTDISBLE 7    : 1   : External reset disabled   : no
+// DWEN      6    : 1   : DebugWIRE active          : no
+// SPIEN     5    : 0   : Serial Program Enabled    : yes
+// WDTON     4    : 1   : Watchdog timer always on  : no
+// EESAVE    3    : 1   : EEPROM preserver on erase : no EEPROM not presevered
+// BODLEVEL [2:1] : 111 : Brownout Dectector level  : ?
+//
+// Low Fuse Byte : 11100010b = 0xE2
+// CKDIV8   7     : 1   : Clock Divided By 8        : don't divide by 8 (8Mhz internal osc)
+// CKOUT    6     : 1   : Clock output enabled      : no
+// SUT      [5:4] : 10  : Start-up time             : 14Clock cycles + 64ms
+// CLKSEL   [3:0] : 0010: Clock select              : calibrated internal osc
+//
+// http://www.engbedded.com/fusecalc/
+// -U lfuse:w:0xe2:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m
+
+
 void setDuty(int16_t duty)
 {
   if (duty>0xFF)
