@@ -11,6 +11,9 @@
 // g/usr/lib/gcc/avr/4.5.3/include
 // /usr/lib/avr/include/avr/iotn25.h
 
+//-U lfuse:w:0xe2:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m
+// CKSEL[3:0] = 2 : Calibrated internal osc
+// SUT[1:0] = 2   : 14CK + 64ms
 
 void setDuty(int16_t duty)
 {
