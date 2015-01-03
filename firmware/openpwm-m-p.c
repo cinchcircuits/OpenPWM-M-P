@@ -4,9 +4,37 @@
 #include <stdint.h>
 #include <util/delay.h>
 
+// sudo apt-get update
+// sudo apt-get install binutils-avr gcc-avr avrdude avr-libc
+
 // avr-gcc -print-file-name=include
 // g/usr/lib/gcc/avr/4.5.3/include
 // /usr/lib/avr/include/avr/iotn25.h
+
+
+void setDuty(int16_t duty)
+{
+  if (duty>0xFF)
+  {
+    duty = 0xFF;
+  }
+  else if (duty < -0xFF)
+  {
+    duty = -0xFF;
+  }
+
+  if (duty < 0)
+  {
+    OCR0A = duty;
+    OCR0B = 0xFF; // 0xFF high always
+  }
+  else 
+  {    
+    OCR0A = 0xFF; // 0xFF high always
+    OCR0B = 0xFF-duty;
+  }
+}
+
 
 int main(void)
 {
@@ -30,13 +58,19 @@ int main(void)
   DDRB = (1<<REV_PIN) | (1<<FWD_PIN) | (1<<LED_PIN);
   PORTB = (1<<LED_PIN) | (1<<PWM_PIN);
   
-
+  int16_t duty = 0;
   while (1)
   {
     PORTB |=  (1<<LED_PIN);
-    _delay_ms(100);
+    _delay_ms(10);
     PORTB &=~ (1<<LED_PIN);
-    _delay_ms(100);
+    _delay_ms(10);
+    duty-=10;
+    if (duty < -300)
+    {
+      duty = 0;
+    }
+    setDuty(duty);
   }
 
   return 0;
