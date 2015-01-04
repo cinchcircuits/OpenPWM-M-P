@@ -83,14 +83,18 @@ enum {
 
 
 
-/* 
- * Set duty of output PWM
+/**
+ * Set duty of motor output
  *    value of 255 = full forward
  *    value of -255 = full reverse
  *    value of 0 = stop/brake
  */
-void setDuty(int16_t duty)
+void setMotorOutput(int16_t duty)
 {
+  // Enable Timer/Counter0 outputs 
+  enum { T0_COMv = 2 }; //non-inverting (for fast PWM)
+  TCCR0A |= (T0_COMv<<COM0A0) | (T0_COMv<<COM0B0);
+
   if (duty>0xFF)
   {
     duty = 0xFF;
@@ -112,6 +116,18 @@ void setDuty(int16_t duty)
   }
 }
 
+
+/**
+ * Disables motor output : effectivly high-Z outputs
+ *  When both REV and FWD inputs to motor are low the motor driver disables its outputs
+ *  Because of how the PWM signals are generated, a always low output cannot be generated,
+ *  So 
+ */
+void disableMotor()
+{
+  // disable both timer outputs by setting botCOM0A/B to 0
+  TCCR0A &= 0x0F;
+}
 
 /// Updated by times
 volatile uint8_t g_pwm_pulse_width = 0;
@@ -160,17 +176,11 @@ ISR(INT0_vect)
 
 int main(void)
 {
-
-  // Initialize Timer/Counter0 as two-output PWM
-  enum { T0_COMv = 2 }; //non-inverting (for fast PWM)
+  // Enable PWM mode on timer 0 without actually enabling outputs
   enum { T0_WGMv = 3 }; //fast PWM mode use 0xFF as TOP
+  TCCR0A = (T0_WGMv&3);
   enum { T0_CSv = 1 };  //use internal clock with no prescalling
-  TCCR0A = (T0_COMv<<COM0A0) | (T0_COMv<<COM0B0) | (T0_WGMv&3);
   TCCR0B = ((T0_WGMv>>2)<<WGM02) | T0_CSv;
-
-  // Set initial duty values
-  OCR0A = 0xFF;
-  OCR0B = 0xFF;
 
   // Initialize Timer/Counter1 as free-running 0 to 0xFF
   // Pin change interrupt will read timer value on rising and falling edges 
@@ -212,7 +222,7 @@ int main(void)
     int16_t pulse_width = g_pwm_pulse_width; 
     if (pulse_width == 0)
     {
-      setDuty(0);
+      disableMotor();
     }
     else 
     {
@@ -227,7 +237,7 @@ int main(void)
       //  To get same result multiple duty by 5.1*8 and shift left by 3 to divide by 8
       //    50*41>>3 = 256 
       duty = (duty*41) >> 3;
-      setDuty(duty);
+      setMotorOutput(duty);
     }
   }
 
