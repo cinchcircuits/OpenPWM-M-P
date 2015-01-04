@@ -135,8 +135,12 @@ volatile uint8_t g_pwm_pulse_width = 0;
 /// number of times PWM overflow between getting pulses
 uint8_t g_pwm_overflow_count = 0;
 
+/// Used by main loop for flashing LED
+volatile char g_overflow_flag = 0;
+
 ISR(TIMER1_OVF_vect)
 {
+  g_overflow_flag = 1;
   if (g_pwm_overflow_count < 250)
   {
     ++g_pwm_overflow_count;
@@ -157,14 +161,12 @@ ISR(INT0_vect)
   if (PINB & (1<<PWM_PIN))
   {    
     // rising edge of PWM
-    PORTB |= (1<<LED_PIN);
     pwm_rising_edge = TCNT1;
     g_pwm_overflow_count = 0;
   }
   else
   {
     // falling edge of PWM
-    PORTB &= ~(1<<LED_PIN);  
     if (g_pwm_overflow_count < 2)
     {
       // if overflow count is more than 1 then this was not a valid pulse width
@@ -214,14 +216,22 @@ int main(void)
   // Enable interrupts
   sei();
 
+
+  uint8_t flash_count = 0;
   while (1)
   {
-    _delay_ms(20);
+    // Count 2ms overflows to determine when to flash LED
+    if (g_overflow_flag)
+    {
+      g_overflow_flag = 0;
+      ++flash_count;
+    }
 
-    // pwm pulse width is voltile (changed by interrupt) so read it only once before using it
+    // pwm pulse width is volatile (changed by interrupt) so read it only once before using it
     int16_t pulse_width = g_pwm_pulse_width; 
     if (pulse_width == 0)
     {
+      PORTB |= (1<<LED_PIN);
       disableMotor();
     }
     else 
@@ -238,6 +248,13 @@ int main(void)
       //    50*41>>3 = 256 
       duty = (duty*41) >> 3;
       setMotorOutput(duty);
+
+      // When getting good signal, flash LED slowly
+      if (flash_count > 100)
+      {
+        flash_count = 0;
+        PORTB ^= (1<<LED_PIN);
+      }
     }
   }
 
