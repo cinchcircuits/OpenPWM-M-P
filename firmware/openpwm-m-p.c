@@ -83,6 +83,12 @@ enum {
 
 
 
+/* 
+ * Set duty of output PWM
+ *    value of 255 = full forward
+ *    value of -255 = full reverse
+ *    value of 0 = stop/brake
+ */
 void setDuty(int16_t duty)
 {
   if (duty>0xFF)
@@ -107,25 +113,47 @@ void setDuty(int16_t duty)
 }
 
 
+/// Updated by times
+volatile uint8_t g_pwm_pulse_width = 0;
+
+/// number of times PWM overflow between getting pulses
+uint8_t g_pwm_overflow_count = 0;
 
 ISR(TIMER1_OVF_vect)
 {
-  //emptpy for now
+  if (g_pwm_overflow_count < 250)
+  {
+    ++g_pwm_overflow_count;
+  }
+  else 
+  {
+    // if the timer has overflowed for more than 200 times 
+    // then it has been 0.5seconds since the last good pwm pulse was recieved, 
+    // and the motors output should be disabled
+    g_pwm_pulse_width = 0;
+  }
 }
-
 
 ISR(INT0_vect)
 {
+  static uint8_t pwm_rising_edge = 0;
   // Flash LED
   if (PINB & (1<<PWM_PIN))
-  {
+  {    
     // rising edge of PWM
     PORTB |= (1<<LED_PIN);
+    pwm_rising_edge = TCNT1;
+    g_pwm_overflow_count = 0;
   }
   else
   {
     // falling edge of PWM
     PORTB &= ~(1<<LED_PIN);  
+    if (g_pwm_overflow_count < 2)
+    {
+      // if overflow count is more than 1 then this was not a valid pulse width
+      g_pwm_pulse_width = TCNT1 - pwm_rising_edge;
+    }    
   }
 }
 
@@ -176,16 +204,31 @@ int main(void)
   // Enable interrupts
   sei();
 
-  int16_t duty = 0;
   while (1)
   {
     _delay_ms(20);
-    duty-=10;
-    if (duty < -300)
+
+    // pwm pulse width is voltile (changed by interrupt) so read it only once before using it
+    int16_t pulse_width = g_pwm_pulse_width; 
+    if (pulse_width == 0)
     {
-      duty = 0;
+      setDuty(0);
     }
-    setDuty(duty);
+    else 
+    {
+      // Scale and offset PWM pulse with so that 1.9us pulse produces duty of 255, 
+      //   and 1.1ms pulse produces duty of -255
+      // 1 LSB of pulse width is nominally 8uSec ( 1/8Mhz * 64 = 8usec)
+      // zero throttle is about 1.5ms, which is 187.5 (1.5msec/8usec = 187.5)
+      int16_t duty = (int16_t)pulse_width - 187;
+      // Range on PWM pulse is 1.9-1.1 = 0.8ms = 100.
+      // rescale PWM so that pulse of -50 becomes -255 and +50 becomes 255
+      //  We want to multiply duty by 5.1 (255/50 = 5.1)
+      //  To get same result multiple duty by 5.1*8 and shift left by 3 to divide by 8
+      //    50*41>>3 = 256 
+      duty = (duty*41) >> 3;
+      setDuty(duty);
+    }
   }
 
   return 0;
